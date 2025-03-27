@@ -1,58 +1,49 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, FlatList, ActivityIndicator, RefreshControl, Image, StyleSheet } from "react-native";
+import React, { useEffect } from "react";
+import { View, Text, FlatList, ActivityIndicator, Image } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchNews, clearNews } from "../redux/newsSlice";
+import { fetchNews } from "../redux/newsSlice";
 
-const HomeScreen = () => {
+const HomeScreen = ({ navigation }) => {
   const dispatch = useDispatch();
-  const { articles, loading, error } = useSelector((state) => state.news);
-  const [refreshing, setRefreshing] = useState(false);
+  const { articles, loading, error, page } = useSelector((state) => state.news);
 
   useEffect(() => {
-    dispatch(fetchNews()); // Load news on screen load
+    if (articles.length === 0) {
+      dispatch(fetchNews());
+    }
   }, [dispatch]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    dispatch(clearNews()); // 🔥 Clears old news first
-    dispatch(fetchNews())
-      .then(() => setRefreshing(false))
-      .catch(() => setRefreshing(false));
+  const loadMoreNews = () => {
+    if (!loading) {
+      dispatch(fetchNews(page + 1));
+    }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Latest Indian News 🇮🇳</Text>
-      {loading && !refreshing && <ActivityIndicator size="large" color="blue" />}
-      {error && <Text style={styles.error}>Error: {error}</Text>}
-      
+    <View style={{ flex: 1, padding: 16 }}>
+      {loading && page === 1 && <ActivityIndicator size="large" color="blue" />}
+      {error && <Text style={{ color: "red" }}>{error}</Text>}
+
       <FlatList
         data={articles}
-        keyExtractor={(item) => item.url}
+        keyExtractor={(item, index) => `${item.url}-${index}`} // ✅ Force unique keys
         renderItem={({ item }) => (
-          <View style={styles.newsItem}>
-            {item.urlToImage ? (
-              <Image source={{ uri: item.urlToImage }} style={styles.newsImage} />
-            ) : (
-              <Text style={styles.noImageText}>No Image Available</Text>
+          <View style={{ marginBottom: 20 }}>
+            {item.urlToImage && (
+              <Image source={{ uri: item.urlToImage }} style={{ height: 200, width: "100%" }} />
             )}
-            <Text style={styles.newsTitle}>{item.title}</Text>
+            <Text style={{ fontSize: 18, fontWeight: "bold" }}>{item.title}</Text>
+            <Text>{item.description}</Text>
           </View>
         )}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        ListFooterComponent={() =>
+          loading && page > 1 ? <ActivityIndicator size="small" color="blue" /> : null
+        }
+        onEndReached={loadMoreNews}
+        onEndReachedThreshold={0.5}
       />
     </View>
   );
 };
 
 export default HomeScreen;
-
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
-  title: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
-  newsItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: "#ddd", marginBottom: 10 },
-  newsImage: { width: "100%", height: 200, borderRadius: 10, marginBottom: 10 },
-  newsTitle: { fontSize: 18, fontWeight: "500" },
-  error: { color: "red", fontSize: 16, textAlign: "center", marginTop: 20 },
-  noImageText: { fontSize: 14, fontStyle: "italic", color: "gray", textAlign: "center" },
-});
